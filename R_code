@@ -1,0 +1,53 @@
+# reading data and converting them to dataframes R 
+data <- read.csv("/Users/markadut/Desktop/2019_groceries.csv")
+geo_data = read.csv("/Users/markadut/Downloads/Main_US_GroceryStores_Aug2019-GEOMETRY-2019-08-30/Main_US_GroceryStores_Aug2019-GEOMETRY-2019-08-30.csv")
+  
+zip <- max(data$zip_code)
+
+retval <- subset(data, zip_code == max(zip_code))
+print(retval)
+
+brand <- subset(data, (brands == "Whole Foods Market" & city == "los angeles")) #data shows whole foods markets data in la
+print.data.frame(brand)
+
+# downloading all necessary libraries and packages
+library(sf)
+library(maptools)
+library(raster)
+library(spatstat)
+
+install.packages(c("cowplot", "googleway", "ggplot2", "ggrepel", "ggspatial", "libwgeom", "sf", "rnaturalearth", "rnaturalearthdata"))
+
+library("ggplot2")
+theme_set(theme_bw())
+
+library("rnaturalearth")
+library("rnaturalearthdata")
+
+x <- merged_data[, 17] #extracting longitude data from grocery store df
+y <- merged_data[, 16] #extracting latitude data from grocery store df
+xy_df <- data.frame(x, y)
+
+x_pop_density = combined_states[, 1]
+y_pop_density = combined_states[, 2]
+xy_density_dataset = data.frame(x_pop_density, y_pop_density)
+  
+#convert grocery store x y coordinates into a separate dataframe consisting of only 
+#longs and lats
+
+world <- ne_countries(scale = "medium", returnclass = "sf")
+class(world)
+
+#plot(x,y, pch=19)
+
+#start visualizing the grocery store data on the USA continental map
+ggplot(data = world) +
+  geom_sf() +
+  geom_point(data = xy_df, aes(x = x, y = y), size = 0.5, 
+             shape = 23, fill = "darkred") +
+  coord_sf(xlim = c(-130, -65), ylim = c(24.5, 50), expand = FALSE)
+
+# creating raster obejcts for the us state pop density .tif files
+x1 <- raster("/Users/markadut/Downloads/50_US_states_1km_2019_PD_UNadj/states_density_tiff/US-AZ_pd_2019_1km_UNadj.tif")
+arizona_density_hist = hist(x1, main=NULL, las=1)
+
