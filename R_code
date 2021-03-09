@@ -53,11 +53,10 @@ library(maptools)
 library(spatstat)
 
 # creating raster obejcts for the us state pop density .tif files
-pop <- raster("/Users/markadut/Downloads/50_US_states_1km_2019_PD_UNadj/states_density_tiff/US-CA_pd_2019_1km_UNadj.tif")
-img  <- as.im(pop)
-plot(img)
+img <- raster("/Users/markadut/Downloads/50_US_states_1km_2019_PD_UNadj/states_density_tiff/US-CA_pd_2019_1km_UNadj.tif")
+pop  <- as.im(img)
+#plot(img)
 california_csv = read.csv("/Users/markadut/Desktop/50_states_pop_density/US-CA_pd_2019_1km_UNadj_ASCII_XYZ.csv")
-
 
 # merge the Geo data and grocery data
 merged_grocery_data <- merge(data,geo_data,by="safegraph_place_id")
@@ -78,24 +77,25 @@ california_groceries <- ggplot(data = world) +
 
 print(california_groceries)
 
-plot(x1,axes = FALSE,legend=FALSE)
-print(california_groceries)
-
-hist(x1, main=NULL, las=1) # pop density raster layer historgram
+hist(pop, main=NULL, las=1)# pop density raster layer historgram
 pop.lg <- log(pop)
 hist(pop.lg, main=NULL, las=1)
-
-
-# Set working directory to the californian_grocery_stores_file
-setwd("/Users/markadut/Downloads/california_grocery_stores") # Replace the file path with the actual location of your shapefiles.
-
-#plotting the California shape file border
-s  <- st_read("/Users/markadut/Downloads/CA_State")
-ca  <- as.owin(s)
 
 library(maptools)
 library(rgdal)
 library(spatstat)
+
+setwd("/Users/markadut/Desktop/DATA 1150 FELLOW/CA_Boundary_Projected") # Replace the file path with the actual location of your shapefiles.
+
+#plotting the California shape file border
+s  <- readOGR("/Users/markadut/Desktop/DATA 1150 FELLOW/CA_Boundary_Projected")
+s.sf <- as(s, "sf")
+s.sf.utm <- st_transform(s.sf, 32619) # project from geographic to UTM
+ca <- as.owin(s.sf.utm)
+plot(ca)
+
+# Set working directory to the californian_grocery_stores_file
+setwd("/Users/markadut/Downloads/california_grocery_stores") # Replace the file path with the actual location of your shapefiles.
 
 #reading California_grocery_stores shapefile - got from ArcGIS
 c  <- readOGR("/Users/markadut/Downloads/california_grocery_stores")  # Don't add the .shp extension
@@ -103,18 +103,36 @@ c  <- readOGR("/Users/markadut/Downloads/california_grocery_stores")  # Don't ad
 #creating .ppp object for California grocery stores
 
 p.sf  <- as(c, "sf")      # Create Spatial* object
+st_crs(p.sf)
 p.sf.utm <- st_transform(p.sf, 32619) # project from geographic to UTM
 p.sp  <- as(p.sf.utm, "Spatial")      # Create Spatial* object
 groceries <- as(p.sp, "ppp")             # Create .ppp object
-class(groceries)
+class(groceries) 
 
 marks(groceries)  <- NULL
 Window(groceries) <- ca
 
-plot(groceries, main=NULL, cols=rgb(0,0,0,.2), pch=20)
+Q <- quadratcount(groceries, nx= 6, ny=6) 
+plot(groceries, main=NULL, cols="grey70",pch=20) # add quadrant grid
+plot(Q, add = TRUE) 
 
-Q <- quadratcount(groceries, nx= 6, ny=6)
-plot(Q)
+# Compute the density for each quadrat
+Q.d <- intensity(Q)
+# Plot the density
+plot(intensity(Q, image=TRUE), main=NULL, las=1)  # Plot density raster
+plot(starbucks, pch=20, cex=0.6, col=rgb(0,0,0,.5), add=TRUE)  # Add points
 
 
+# scaling the groceries data shape as well as the Cali shapefile and the population density layer
+groceries.km <- rescale(groceries, 1000, "km")
+ca.km <- rescale(ca, 1000, "km")
+pop.km  <- rescale(pop, 1000, "km")
+pop.lg.km <- rescale(pop.lg, 1000, "km")
 
+# Compute the density for each quadrat (in counts per km2)
+Q  <- quadratcount(groceries.km, nx= 6, ny=6)
+Q.d <- intensity(Q)
+
+# Plot the density
+plot(intensity(Q, image=TRUE), main=NULL, las=1)  # Plot density raster
+plot(groceries.km, pch=20, cex=0.6, col=rgb(0,0,0,.5), add=TRUE)  # Add points
