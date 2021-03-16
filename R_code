@@ -55,8 +55,8 @@ library(spatstat)
 # creating raster obejcts for the us state pop density .tif files
 img <- raster("/Users/markadut/Downloads/50_US_states_1km_2019_PD_UNadj/states_density_tiff/US-CA_pd_2019_1km_UNadj.tif")
 pop  <- as.im(img)
-#plot(img)
-california_csv = read.csv("/Users/markadut/Desktop/50_states_pop_density/US-CA_pd_2019_1km_UNadj_ASCII_XYZ.csv")
+print(pop)
+print(img)
 
 # merge the Geo data and grocery data
 merged_grocery_data <- merge(data,geo_data,by="safegraph_place_id")
@@ -85,29 +85,17 @@ library(maptools)
 library(rgdal)
 library(spatstat)
 
-setwd("/Users/markadut/Desktop/DATA 1150 FELLOW/CA_Boundary_Projected") # Replace the file path with the actual location of your shapefiles.
+setwd("/Users/markadut/Desktop/DATA 1150 FELLOW/3_9_NewFiles") # Replace the file path with the actual location of your shapefiles.
 
 #plotting the California shape file border
-s  <- readOGR("/Users/markadut/Desktop/DATA 1150 FELLOW/CA_Boundary_Projected")
-s.sf <- as(s, "sf")
-s.sf.utm <- st_transform(s.sf, 32619) # project from geographic to UTM
-ca <- as.owin(s.sf.utm)
+s  <- readOGR(".","CA_boundary")
+ca <- as.owin(s)
 plot(ca)
 
-# Set working directory to the californian_grocery_stores_file
-setwd("/Users/markadut/Downloads/california_grocery_stores") # Replace the file path with the actual location of your shapefiles.
-
 #reading California_grocery_stores shapefile - got from ArcGIS
-c  <- readOGR("/Users/markadut/Downloads/california_grocery_stores")  # Don't add the .shp extension
-
-#creating .ppp object for California grocery stores
-
-p.sf  <- as(c, "sf")      # Create Spatial* object
-st_crs(p.sf)
-p.sf.utm <- st_transform(p.sf, 32619) # project from geographic to UTM
-p.sp  <- as(p.sf.utm, "Spatial")      # Create Spatial* object
-groceries <- as(p.sp, "ppp")             # Create .ppp object
-class(groceries) 
+c  <- readOGR(".", "Groceries")  
+groceries <- as(c, "ppp")             # Create .ppp object
+plot(groceries)
 
 marks(groceries)  <- NULL
 Window(groceries) <- ca
@@ -120,8 +108,7 @@ plot(Q, add = TRUE)
 Q.d <- intensity(Q)
 # Plot the density
 plot(intensity(Q, image=TRUE), main=NULL, las=1)  # Plot density raster
-plot(starbucks, pch=20, cex=0.6, col=rgb(0,0,0,.5), add=TRUE)  # Add points
-
+plot(groceries, pch=20, cex=0.6, col=rgb(0,0,0,.5), add=TRUE)  # Add points
 
 # scaling the groceries data shape as well as the Cali shapefile and the population density layer
 groceries.km <- rescale(groceries, 1000, "km")
@@ -129,10 +116,56 @@ ca.km <- rescale(ca, 1000, "km")
 pop.km  <- rescale(pop, 1000, "km")
 pop.lg.km <- rescale(pop.lg, 1000, "km")
 
-# Compute the density for each quadrat (in counts per km2)
+# Compute the density for each quadrant (in counts per km2)
 Q  <- quadratcount(groceries.km, nx= 6, ny=6)
 Q.d <- intensity(Q)
+print(Q.d)
 
 # Plot the density
 plot(intensity(Q, image=TRUE), main=NULL, las=1)  # Plot density raster
 plot(groceries.km, pch=20, cex=0.6, col=rgb(0,0,0,.5), add=TRUE)  # Add points
+
+# we divide the population density covariate into tessellated surfaces
+brk  <- c(-Inf, 4, 6, 8, Inf)  # Define the breaks
+Zcut <- cut(pop.lg.km, breaks=brk, labels=1:4)  # Classify the raster
+E <- tess(image=Zcut)  # Create a tessellated surface
+
+plot(E, main="", las=1)
+
+plot(intensity(Q, image=TRUE), las=1, main=NULL)
+plot(groceries.km, pch=20, cex=0.6, col=rgb(1,1,1,.5), add=TRUE)
+
+# changing the color scheme of the graph
+cl <-  interp.colours(c("lightyellow", "orange" ,"red"), E$n)
+plot( intensity(Q, image=TRUE), las=1, col=cl, main=NULL)
+plot(groceries.km, pch=20, cex=0.6, col=rgb(0,0,0,.5), add=TRUE)
+
+
+#Calculate Isotropic Kernel Intensity Estimate of the Point Pattern
+K1 <- density(groceries.km) # Using the default bandwidth
+plot(K1, main=NULL, las=1)
+contour(K1, add=TRUE)
+
+#In this next chunk, a 50 km bandwidth (sigma = 50) is used.
+#Note that the length unit is extracted from the point layer’s mapping units
+
+K2 <- density(groceries.km, sigma=50) # Using a 50km bandwidth
+plot(K2, main=NULL, las=1)
+contour(K2, add=TRUE)
+
+#The kernel defaults to a gaussian smoothing function. 
+#The smoothing function can be changed to a quartic, 
+#disc or epanechnikov function. For example, to change the kernel to a 
+#disc function type:
+
+K3 <- density(groceries.km, kernel = "disc", sigma=50) # Using a 50km bandwidth
+plot(K3, main=NULL, las=1)
+contour(K3, add=TRUE)
+
+# Kernel density adjusted for covariate
+
+# Compute rho using the ratio method
+rho <- rhohat(groceries.km, pop.lg.km,  method="ratio")
+# Generate rho vs covariate plot
+plot(rho, las=1, main=NULL, legendargs=list(cex=0.8, xpd=TRUE, inset=c(1.01, 0) ))
+
