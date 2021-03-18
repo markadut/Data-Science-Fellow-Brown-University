@@ -28,10 +28,6 @@ x <- geo_data[, 3] #extracting longitude data from grocery store df
 y <- geo_data[, 2] #extracting latitude data from grocery store df
 xy_df <- data.frame(x, y)
 
-x_pop_density = combined_states[, 1]
-y_pop_density = combined_states[, 2]
-xy_density_dataset = data.frame(x_pop_density, y_pop_density)
-  
 #convert grocery store x y coordinates into a separate dataframe consisting of only 
 #longs and lats
 
@@ -53,10 +49,9 @@ library(maptools)
 library(spatstat)
 
 # creating raster obejcts for the us state pop density .tif files
-img <- raster("/Users/markadut/Downloads/50_US_states_1km_2019_PD_UNadj/states_density_tiff/US-CA_pd_2019_1km_UNadj.tif")
+img <- raster("/Users/markadut/Desktop/cali_projected_raster.tif")
 pop  <- as.im(img)
-print(pop)
-print(img)
+plot(pop)
 
 # merge the Geo data and grocery data
 merged_grocery_data <- merge(data,geo_data,by="safegraph_place_id")
@@ -125,7 +120,7 @@ plot(intensity(Q, image=TRUE), main=NULL, las=1)  # Plot density raster
 plot(groceries.km, pch=20, cex=0.6, col=rgb(0,0,0,.5), add=TRUE)  # Add points
 
 # we divide the population density covariate into tessellated surfaces
-brk  <- c(-Inf, 0, 2, 4, Inf)  # Define the breaks
+brk  <- c(-Inf, 2, 4, 6, Inf)  # Define the breaks
 Zcut <- cut(pop, breaks=brk, labels=1:4)  # Classify the raster
 E <- tess(image=Zcut)  # Create a tessellated surface
 
@@ -147,7 +142,7 @@ contour(K1, add=TRUE)
 #In this next chunk, a 50 km bandwidth (sigma = 50) is used.
 #Note that the length unit is extracted from the point layer’s mapping units
 
-K2 <- density(groceries.km, sigma=50) # Using a 50km bandwidth
+K2 <- density(groceries.km, sigma=150) # Using a 150km bandwidth
 plot(K2, main=NULL, las=1)
 contour(K2, add=TRUE)
 
@@ -156,16 +151,83 @@ contour(K2, add=TRUE)
 #disc or epanechnikov function. For example, to change the kernel to a 
 #disc function type:
 
-K3 <- density(groceries.km, kernel = "disc", sigma=50) # Using a 50km bandwidth
+K3 <- density(groceries.km, kernel = "disc", sigma=150) # Using a 150km bandwidth
 plot(K3, main=NULL, las=1)
 contour(K3, add=TRUE)
 
 # Kernel density adjusted for covariate
 
 # Compute rho using the ratio method
-rho <- rhohat(groceries.km, pop.lg.km,  method="ratio")
+#rho <- rhohat(groceries.km, pop.lg.km,  method="ratio")
 # Generate rho vs covariate plot
-plot(rho, las=1, main=NULL, legendargs=list(cex=0.8, xpd=TRUE, inset=c(1.01, 0) ))
+#plot(rho, las=1, main=NULL, legendargs=list(cex=0.8, xpd=TRUE, inset=c(1.01, 0) ))
 
 
+# setting the 1st nearest neighbor distance to 1
+mean(nndist(groceries.km, k=1))
 
+# setting the 1st nearest neighbor distance to 1
+mean(nndist(groceries.km, k=2))
+
+#nearest neighbor analysis
+ANN <- apply(nndist(groceries.km, k=1:100),2,FUN=mean)
+plot(ANN ~ eval(1:100), type="b", main=NULL, las=1, xlab = "neighbor order number",  ylab = "ANN (km)")
+
+#K estimate function/plot
+K <- Kest(groceries.km)
+plot(K, main=NULL, las=1)
+
+#L estimate function/plot
+L <- Lest(roceries.km, main=NULL)
+plot(L, main=NULL, las=1)
+
+#Now, we can plot the L function as well as the Lexpected function
+plot(L, . -r ~ r, main=NULL, las=1)
+
+#Analysis using Pair Correlation Function
+g  <- pcf(groceries.km)
+plot(g, main=NULL, las=1)
+
+
+ann.p <- mean(nndist(groceries.km, k=1))
+ann.p
+
+n <- 599L               # setting the number of simulations
+ann.r <- vector(length = n) # creating empty object to store simulation results (ANN values)
+for (i in 1:n){
+  rand.p   <- rpoint(n=groceries.km$n, win=ca.km)  # generating random point locations
+  ann.r[i] <- mean(nndist(rand.p, k=1))  # Tally the ANN values
+}
+
+plot(rand.p, pch=16, main=NULL, cols=rgb(0,0,0,0.5))
+
+hist(ann.r, main=NULL, las=1, breaks=40, col="bisque", xlim=range(ann.p, ann.r))
+abline(v=ann.p, col="blue")
+
+n <- 599L
+ann.r <- vector(length=n)
+for (i in 1:n){
+  rand.p  <- rpoint(n=groceries.km$n, f=pop.km)  # substituting ca.km to pop.km
+  ann.r[i] <- mean(nndist(rand.p, k=1))
+}
+
+Window(rand.p) <- ca.km  # Replace raster mask with ma.km window
+plot(rand.p, pch=16, main=NULL, cols=rgb(0,0,0,0.5))
+
+
+hist(ann.r, main=NULL, las=1, breaks=40, col="bisque", xlim=range(ann.p, ann.r))
+abline(v=ann.p, col="blue")
+
+N.greater <- sum(ann.r > ann.p)
+p <- min(N.greater + 1, n + 1 - N.greater) / (n +1)
+p
+
+PPM1 <- ppm(groceries.km  ~ pop.km) # note that when we use pop.lg.km there are missing values or NA vals
+PPM1
+
+PPM0 <- ppm(groceries.km ~ 1)
+PPM0
+
+groceries.km$n / area(ma.km) 
+
+anova(PPM0, PPM1, test="LRT")
