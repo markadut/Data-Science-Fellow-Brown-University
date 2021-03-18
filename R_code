@@ -95,7 +95,7 @@ plot(ca)
 #reading California_grocery_stores shapefile - got from ArcGIS
 c  <- readOGR(".", "Groceries")  
 groceries <- as(c, "ppp")             # Create .ppp object
-plot(groceries)
+plot(groceries, main=NULL, cols=rgb(0,0,0,.2), pch=20)
 
 marks(groceries)  <- NULL
 Window(groceries) <- ca
@@ -119,15 +119,14 @@ pop.lg.km <- rescale(pop.lg, 1000, "km")
 # Compute the density for each quadrant (in counts per km2)
 Q  <- quadratcount(groceries.km, nx= 6, ny=6)
 Q.d <- intensity(Q)
-print(Q.d)
 
 # Plot the density
 plot(intensity(Q, image=TRUE), main=NULL, las=1)  # Plot density raster
 plot(groceries.km, pch=20, cex=0.6, col=rgb(0,0,0,.5), add=TRUE)  # Add points
 
 # we divide the population density covariate into tessellated surfaces
-brk  <- c(-Inf, 4, 6, 8, Inf)  # Define the breaks
-Zcut <- cut(pop.lg.km, breaks=brk, labels=1:4)  # Classify the raster
+brk  <- c(-Inf, 0, 2, 4, Inf)  # Define the breaks
+Zcut <- cut(pop, breaks=brk, labels=1:4)  # Classify the raster
 E <- tess(image=Zcut)  # Create a tessellated surface
 
 plot(E, main="", las=1)
@@ -139,7 +138,6 @@ plot(groceries.km, pch=20, cex=0.6, col=rgb(1,1,1,.5), add=TRUE)
 cl <-  interp.colours(c("lightyellow", "orange" ,"red"), E$n)
 plot( intensity(Q, image=TRUE), las=1, col=cl, main=NULL)
 plot(groceries.km, pch=20, cex=0.6, col=rgb(0,0,0,.5), add=TRUE)
-
 
 #Calculate Isotropic Kernel Intensity Estimate of the Point Pattern
 K1 <- density(groceries.km) # Using the default bandwidth
@@ -168,4 +166,6 @@ contour(K3, add=TRUE)
 rho <- rhohat(groceries.km, pop.lg.km,  method="ratio")
 # Generate rho vs covariate plot
 plot(rho, las=1, main=NULL, legendargs=list(cex=0.8, xpd=TRUE, inset=c(1.01, 0) ))
+
+
 
