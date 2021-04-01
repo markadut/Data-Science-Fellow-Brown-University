@@ -1,7 +1,7 @@
 # reading data and converting them to dataframes R 
 data <- read.csv("/Users/markadut/Desktop/2019_groceries.csv")
 geo_data = read.csv("/Users/markadut/Downloads/Main_US_GroceryStores_Aug2019-GEOMETRY-2019-08-30/Main_US_GroceryStores_Aug2019-GEOMETRY-2019-08-30.csv")
-  
+
 zip <- max(data$zip_code)
 
 retval <- subset(data, zip_code == max(zip_code))
@@ -38,20 +38,12 @@ class(world)
 
 #start visualizing the grocery store data on the USA continental map
 p <- ggplot(data = world) +
-    geom_sf() +
-     geom_point(data = xy_df, aes(x = x, y = y), size = 0.5, 
+  geom_sf() +
+  geom_point(data = xy_df, aes(x = x, y = y), size = 0.5, 
              shape = 23, fill = "darkred") +
   coord_sf(xlim = c(-128, -66), ylim = c(24, 50), expand = FALSE)
 
 plot(p)
-
-library(maptools)
-library(spatstat)
-
-# creating raster obejcts for the us state pop density .tif files
-img <- raster("/Users/markadut/Desktop/cali_projected_raster.tif")
-pop  <- as.im(img)
-plot(pop)
 
 # merge the Geo data and grocery data
 merged_grocery_data <- merge(data,geo_data,by="safegraph_place_id")
@@ -72,15 +64,20 @@ california_groceries <- ggplot(data = world) +
 
 print(california_groceries)
 
+# Point Pattern Analysis
+
+# Creating raster obejcts for the us state pop density .tif files
+img <- raster("/Users/markadut/Desktop/cali_projected_raster.tif")
+pop  <- as.im(img)
+plot(pop)
+
 hist(pop, main=NULL, las=1)# pop density raster layer historgram
 pop.lg <- log(pop)
 hist(pop.lg, main=NULL, las=1)
 
-library(maptools)
-library(rgdal)
-library(spatstat)
-
 setwd("/Users/markadut/Desktop/DATA 1150 FELLOW/3_9_NewFiles") # Replace the file path with the actual location of your shapefiles.
+
+library(rgdal)
 
 #plotting the California shape file border
 s  <- readOGR(".","CA_boundary")
@@ -139,7 +136,7 @@ K1 <- density(groceries.km) # Using the default bandwidth
 plot(K1, main=NULL, las=1)
 contour(K1, add=TRUE)
 
-#In this next chunk, a 50 km bandwidth (sigma = 50) is used.
+#In this next chunk, a 150 km bandwidth (sigma = 150) is used.
 #Note that the length unit is extracted from the point layer’s mapping units
 
 K2 <- density(groceries.km, sigma=150) # Using a 150km bandwidth
@@ -156,17 +153,34 @@ plot(K3, main=NULL, las=1)
 contour(K3, add=TRUE)
 
 # Kernel density adjusted for covariate
-
 # Compute rho using the ratio method
-#rho <- rhohat(groceries.km, pop.lg.km,  method="ratio")
-# Generate rho vs covariate plot
-#plot(rho, las=1, main=NULL, legendargs=list(cex=0.8, xpd=TRUE, inset=c(1.01, 0) ))
+rho <- rhohat(groceries, pop, method="ratio")
 
+#Generate rho vs covariate plot
+plot(rho, las=1, main=NULL, legendargs=list(cex=0.8, xpd=TRUE))
+
+pred <- predict(rho)
+cl  <- interp.colours(c("lightyellow", "orange" ,"red"), 100) # Create color scheme
+plot(pred, col=cl, las=1, main=NULL, gamma = 0.25)
+
+K1_vs_K1 <- pairs(K1, K1, labels = c("K1a", "K1b"), plot = FALSE)
+plot(K1_vs_K1$K1a ~ K1_vs_K1$K1b, pch=20,
+     xlab = "Observed intensity", 
+     ylab = "Observed intensity")
+
+
+# Create the Poisson point process model
+PPM1 <- ppm(groceries.km ~ pop.km)
+# Plot the relationship
+a <- plot(effectfun(PPM1, "pop.km", se.fit=TRUE), main=NULL, 
+          las=1)
+
+PPM1
 
 # setting the 1st nearest neighbor distance to 1
 mean(nndist(groceries.km, k=1))
 
-# setting the 1st nearest neighbor distance to 1
+# setting the 1st nearest neighbor distance to 2
 mean(nndist(groceries.km, k=2))
 
 #nearest neighbor analysis
@@ -178,7 +192,7 @@ K <- Kest(groceries.km)
 plot(K, main=NULL, las=1)
 
 #L estimate function/plot
-L <- Lest(roceries.km, main=NULL)
+L <- Lest(groceries.km, main=NULL)
 plot(L, main=NULL, las=1)
 
 #Now, we can plot the L function as well as the Lexpected function
@@ -187,7 +201,6 @@ plot(L, . -r ~ r, main=NULL, las=1)
 #Analysis using Pair Correlation Function
 g  <- pcf(groceries.km)
 plot(g, main=NULL, las=1)
-
 
 ann.p <- mean(nndist(groceries.km, k=1))
 ann.p
@@ -214,7 +227,6 @@ for (i in 1:n){
 Window(rand.p) <- ca.km  # Replace raster mask with ma.km window
 plot(rand.p, pch=16, main=NULL, cols=rgb(0,0,0,0.5))
 
-
 hist(ann.r, main=NULL, las=1, breaks=40, col="bisque", xlim=range(ann.p, ann.r))
 abline(v=ann.p, col="blue")
 
@@ -231,4 +243,5 @@ PPM0
 groceries.km$n / area(ma.km) 
 
 anova(PPM0, PPM1, test="LRT")
+
 
